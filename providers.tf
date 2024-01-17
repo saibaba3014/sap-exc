@@ -7,6 +7,7 @@ provider "google" {
   region  = var.region
 }
 
+#to install usin applications using Helm and terraform
 provider "helm" {
   kubernetes {
     config_path = "~/.kube/config"

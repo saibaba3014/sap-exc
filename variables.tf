@@ -25,7 +25,13 @@ variable "subnetwork_name" {
   description = "name for the subnetwork"
   type        = string
 }
+variable "master_ipv4_cidr_block" {
+  type        = string
+}
 
+variable "nat_router_name" {
+  type        = string
+}
 variable "subnetwork_range" {
   description = "CIDR for subnetwork nodes"
   type        = string

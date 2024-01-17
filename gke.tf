@@ -7,23 +7,24 @@ module "service_account" {
 
 # create VPC
 resource "google_compute_network" "vpc" {
-  name                    = "k8s-vpc-2"
+  name                    = var.network
   auto_create_subnetworks = false
+
 }
 
 # Create Subnet
 resource "google_compute_subnetwork" "subnet" {
-  name          = "k8s-subnet-2"
+  name          = var.subnetwork
   region        = var.region
   network       = google_compute_network.vpc.name
-  ip_cidr_range = "10.0.0.0/24"
+  ip_cidr_range = var.subnetwork_range
 }
 
 
 
 # Create GKE cluster with 2 nodes in our custom VPC/Subnet
 resource "google_container_cluster" "primary" {
-  name                     = "k8s-cluster"
+  name                     = var.name
   location                 = var.k8s_region
   network                  = google_compute_network.vpc.name
   subnetwork               = google_compute_subnetwork.subnet.name
@@ -33,11 +34,11 @@ resource "google_container_cluster" "primary" {
   private_cluster_config {
     enable_private_endpoint = true
     enable_private_nodes    = true
-    master_ipv4_cidr_block  = "10.13.0.0/28"
+    master_ipv4_cidr_block  = var.master_ipv4_cidr_block
   }
   ip_allocation_policy {
-    cluster_ipv4_cidr_block  = "10.11.0.0/21"
-    services_ipv4_cidr_block = "10.12.0.0/21"
+    cluster_ipv4_cidr_block  = var.pod_subnetwork_range
+    services_ipv4_cidr_block = var.svc_subnetwork_range
   }
   master_authorized_networks_config {
     cidr_blocks {
@@ -46,6 +47,7 @@ resource "google_container_cluster" "primary" {
     }
 
   }
+  depends_on = [module.service_account]
 }
 
 # Create managed node pool
@@ -71,6 +73,7 @@ resource "google_container_node_pool" "primary_nodes" {
       disable-legacy-endpoints = "true"
     }
   }
+ depends_on = [module.service_account]
 }
 
 
@@ -90,7 +93,7 @@ resource "google_compute_address" "my_internal_ip_addr" {
 resource "google_compute_instance" "default" {
   project      = var.project_id
   zone         = var.k8s_region
-  name         = "jump-host-1"
+  name         = "bastion-host-1"
   machine_type = "e2-medium"
 
   boot_disk {
@@ -106,6 +109,7 @@ resource "google_compute_instance" "default" {
   metadata = {
     ssh-keys = "rk8s:${file("bastion.txt")}"
   }
+  depends_on = [module.service_account]
 }
 
 
@@ -134,8 +138,9 @@ resource "google_compute_firewall" "default" {
     protocol = "tcp"
     ports    = ["80", "8080", "1000-2000"]
   }
-
+  
   source_service_accounts = [module.service_account.email]
+  depends_on = [module.service_account]
 }
 
 ## Create IAP SSH permissions for your test instance
@@ -143,15 +148,16 @@ resource "google_compute_firewall" "default" {
 resource "google_project_iam_member" "project" {
   project = var.project_id
   role    = "roles/iap.tunnelResourceAccessor"
-  member  = "serviceAccount:terraform-sa@k8s-workshop-hari.iam.gserviceaccount.com"
+  member  = module.service_account.email
 }
 
 # create cloud router for nat gateway
 resource "google_compute_router" "router" {
+  name    = var.nat_router_name
   project = var.project_id
-  name    = "nat-router-1"
   network = google_compute_network.vpc.name
   region  = var.region
+  depends_on = [google_compute_network.vpc]
 }
 
 ## Create Nat Gateway with module
@@ -159,9 +165,9 @@ resource "google_compute_router" "router" {
 module "cloud-nat" {
   source     = "terraform-google-modules/cloud-nat/google"
   version    = "~> 1.2"
+  name       = var.cloud_nat_name
   project_id = var.project_id
   region     = var.region
   router     = google_compute_router.router.name
-  name       = "nat-config-1"
-
+  depends_on = [google_compute_router.router]
 }
