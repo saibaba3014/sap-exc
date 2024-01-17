@@ -61,14 +61,5 @@ Cluster will be accessible from the bastion host
 Step1. install nginx ingress control
  helm repo add nginx-stable https://helm.nginx.com/stable
  helm repo update
+ helm install nginx-ingress nginx-stable/nginx-ingress --set rbac.create=true
 
-
-Step2. Apply the manifest file with the “kubectl apply -f web1.yaml”
-
-
-As you can see, your deployment has been created and exposed to the external load balancer. Now Go ahead and copy the public IP of the load balancer and access it into the browser. You will see the Nginx Welcome page.
-
-
-Congratulations!! You have completed this demo to create a private Kubernetes cluster. Now, if you do create a private cluster, then be aware that in order for it to access other Google APIs you will need to make sure that Private Google Access is enabled. I will cover this in another blog. I hope you like this article.
-
-If you enjoyed this article, please clap n number of times and share it! Feel free to comment with any suggestions. Thanks for Reading!!

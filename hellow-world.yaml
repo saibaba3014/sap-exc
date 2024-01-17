@@ -1,18 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: hello-world
+  name: grafana
   annotations:
 spec:
   ingressClassName: nginx
   rules:
-  - host: hello-world.mehari.dev
+  - host: grafana.k8s.mehari.dev
     http:
       paths:
       - pathType: Prefix
         path: "/"
         backend:
           service:
-            name: hello-world
+            name: grafana
             port:
               number: 80
