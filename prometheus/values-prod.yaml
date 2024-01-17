@@ -69,7 +69,7 @@ alertmanager:
   prefixURL: ""
 
   ## External URL which can access alertmanager
-  baseURL: "https://rsc-alertmanager.retailmaximization.com"
+  baseURL: "http://localhost:9093"
 
   ## Additional alertmanager container environment variable
   ## For instance to add a http_proxy
@@ -210,7 +210,7 @@ alertmanager:
 
     ## alertmanager data Persistent Volume size
     ##
-    size: 50Gi
+    size: 20Gi
 
     ## alertmanager data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -277,7 +277,7 @@ alertmanager:
 
   ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
   ##
-  replicaCount: 1
+  replicaCount: 2
 
   ## Annotations to be added to deployment
   ##
@@ -529,15 +529,11 @@ nodeExporter:
   ## Node tolerations for node-exporter scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
-  tolerations: 
-    - key: "Kafka"
-      operator: "Equal"
-      value: "false"
-      effect: "NoExecute"
-    - key: "Zookeeper"
-      operator: "Equal"
-      value: "false"
-      effect: "NoExecute"
+  tolerations: []
+    # - key: "key"
+    #   operator: "Equal|Exists"
+    #   value: "value"
+    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
 
   ## Node labels for node-exporter pod assignment
   ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
@@ -693,9 +689,7 @@ server:
   ##     secretKeyRef:
   ##       name: mysecret
   ##       key: username
-  env: 
-  - name: JAEGER_AGENT_PORT
-    value: "5755"
+  env: []
 
   extraFlags:
     - web.enable-lifecycle
@@ -899,7 +893,7 @@ server:
 
     ## Prometheus server data Persistent Volume size
     ##
-    size: 100Gi
+    size: 50Gi
 
     ## Prometheus server data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -948,11 +942,7 @@ server:
 
   ## Prometheus AlertManager configuration
   ##
-  alertmanagers: 
-  - scheme: http
-    static_configs:
-    - targets:
-        - "msa-platform-prometheus-alertmanager.msa-platform.svc.cluster.local:80"
+  alertmanagers: []
 
   ## Specify if a Pod Security Policy for node-exporter must be created
   ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
@@ -970,7 +960,7 @@ server:
 
   ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
   ##
-  replicaCount: 1
+  replicaCount: 2
 
   ## Annotations to be added to deployment
   ##
@@ -1313,7 +1303,7 @@ pushgateway:
 
     ## pushgateway data Persistent Volume size
     ##
-    size: 50Gi
+    size: 10Gi
 
     ## pushgateway data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -1341,364 +1331,41 @@ pushgateway:
 ##
 alertmanagerFiles:
   alertmanager.yml:
-    global: 
-      resolve_timeout: 5m
-      smtp_smarthost: smtp.gmail.com:587
-      smtp_from: rsc_developer@litmus7.com
-      smtp_auth_username: rsc_developer@litmus7.com
-      smtp_auth_password: tqmbczzchernzhzt
+    global: {}
+      # slack_api_url: ''
 
     receivers:
-      - name: 'alert-emailer'
-        email_configs:
-        - to: 'rscsupport@litmus7.com'
-          send_resolved: false
-    route: 
-      group_wait: 60s 
+      - name: default-receiver
+        # slack_configs:
+        #  - channel: '@you'
+        #    send_resolved: true
+
+    route:
+      group_wait: 10s
       group_interval: 5m
-      receiver: 'alert-emailer'
-      repeat_interval: 5m
-      group_by: ['alertname']
+      receiver: default-receiver
+      repeat_interval: 3h
+
 ## Prometheus server ConfigMap entries
 ##
 serverFiles:
 
   ## Alerts configuration
   ## Ref: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
-  alerting_rules.yml: 
-    groups:
-    - name: kafka
-      rules:
-      - alert: KafkaRunningOutOfSpace
-        expr: kubelet_volume_stats_available_bytes{persistentvolumeclaim=~"data(-[0-9]+)?-(.+)-kafka-[0-9]+"} * 100 / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"data(-[0-9]+)?-(.+)-kafka-[0-9]+"} < 15
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka is running out of free disk space'
-          description: 'There are only {{ $value }} percent available at {{ $labels.persistentvolumeclaim }} PVC'
-      - alert: UnderReplicatedPartitions
-        expr: kafka_server_replicamanager_underreplicatedpartitions > 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka under replicated partitions'
-          description: 'There are {{ $value }} under replicated partitions on {{ $labels.kubernetes_pod_name }}'
-      - alert: AbnormalControllerState
-        expr: sum(kafka_controller_kafkacontroller_activecontrollercount) by (strimzi_io_name) != 1
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka abnormal controller state'
-          description: 'There are {{ $value }} active controllers in the cluster'
-      - alert: OfflinePartitions
-        expr: sum(kafka_controller_kafkacontroller_offlinepartitionscount) > 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka offline partitions'
-          description: 'One or more partitions have no leader'
-      - alert: UnderMinIsrPartitionCount
-        expr: kafka_server_replicamanager_underminisrpartitioncount > 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka under min ISR partitions'
-          description: 'There are {{ $value }} partitions under the min ISR on {{ $labels.kubernetes_pod_name }}'
-      - alert: OfflineLogDirectoryCount
-        expr: kafka_log_logmanager_offlinelogdirectorycount > 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka offline log directories'
-          description: 'There are {{ $value }} offline log directories on {{ $labels.kubernetes_pod_name }}'
-      - alert: ScrapeProblem
-        expr: up{kubernetes_namespace!~"openshift-.+",kubernetes_pod_name=~".+-kafka-[0-9]+"} == 0
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'Prometheus unable to scrape metrics from {{ $labels.kubernetes_pod_name }}/{{ $labels.instance }}'
-          description: 'Prometheus was unable to scrape metrics from {{ $labels.kubernetes_pod_name }}/{{ $labels.instance }} for more than 3 minutes'
-      - alert: ClusterOperatorContainerDown
-        expr: count((container_last_seen{container="strimzi-cluster-operator"} > (time() - 90))) < 1 or absent(container_last_seen{container="strimzi-cluster-operator"})
-        for: 1m
-        labels:
-          severity: major
-        annotations:
-          summary: 'Cluster Operator down'
-          description: 'The Cluster Operator has been down for longer than 90 seconds'
-      - alert: KafkaBrokerContainersDown
-        expr: absent(container_last_seen{container="kafka",pod=~".+-kafka-[0-9]+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'All `kafka` containers down or in CrashLookBackOff status'
-          description: 'All `kafka` containers have been down or in CrashLookBackOff status for 3 minutes'
-      - alert: KafkaContainerRestartedInTheLast5Minutes
-        expr: count(count_over_time(container_last_seen{container="kafka"}[5m])) > 2 * count(container_last_seen{container="kafka",pod=~".+-kafka-[0-9]+"})
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'One or more Kafka containers restarted too often'
-          description: 'One or more Kafka containers were restarted too often within the last 5 minutes'
-    - name: zookeeper
-      rules:
-      - alert: AvgRequestLatency
-        expr: zookeeper_avgrequestlatency > 10
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Zookeeper average request latency'
-          description: 'The average request latency is {{ $value }} on {{ $labels.kubernetes_pod_name }}'
-      - alert: OutstandingRequests
-        expr: zookeeper_outstandingrequests > 10
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Zookeeper outstanding requests'
-          description: 'There are {{ $value }} outstanding requests on {{ $labels.kubernetes_pod_name }}'
-      - alert: ZookeeperRunningOutOfSpace
-        expr: kubelet_volume_stats_available_bytes{persistentvolumeclaim=~"data-(.+)-zookeeper-[0-9]+"} < 5368709120
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Zookeeper is running out of free disk space'
-          description: 'There are only {{ $value }} bytes available at {{ $labels.persistentvolumeclaim }} PVC'
-      - alert: ZookeeperContainerRestartedInTheLast5Minutes
-        expr: count(count_over_time(container_last_seen{container="zookeeper"}[5m])) > 2 * count(container_last_seen{container="zookeeper",pod=~".+-zookeeper-[0-9]+"})
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'One or more Zookeeper containers were restarted too often'
-          description: 'One or more Zookeeper containers were restarted too often within the last 5 minutes. This alert can be ignored when the Zookeeper cluster is scaling up'
-      - alert: ZookeeperContainersDown
-        expr: absent(container_last_seen{container="zookeeper",pod=~".+-zookeeper-[0-9]+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'All `zookeeper` containers in the Zookeeper pods down or in CrashLookBackOff status'
-          description: 'All `zookeeper` containers in the Zookeeper pods have been down or in CrashLookBackOff status for 3 minutes'
-    - name: entityOperator
-      rules:
-      - alert: TopicOperatorContainerDown
-        expr: absent(container_last_seen{container="topic-operator",pod=~".+-entity-operator-.+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'Container topic-operator in Entity Operator pod down or in CrashLookBackOff status'
-          description: 'Container topic-operator in Entity Operator pod has been or in CrashLookBackOff status for 3 minutes'
-      - alert: UserOperatorContainerDown
-        expr: absent(container_last_seen{container="user-operator",pod=~".+-entity-operator-.+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'Container user-operator in Entity Operator pod down or in CrashLookBackOff status'
-          description: 'Container user-operator in Entity Operator pod have been down or in CrashLookBackOff status for 3 minutes'
-      - alert: EntityOperatorTlsSidecarContainerDown
-        expr: absent(container_last_seen{container="tls-sidecar",pod=~".+-entity-operator-.+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'Container tls-sidecar Entity Operator pod down or in CrashLookBackOff status'
-          description: 'Container tls-sidecar in Entity Operator pod have been down or in CrashLookBackOff status for 3 minutes'
-   
-    - name: bridge
-      rules:
-      - alert: BridgeContainersDown
-        expr: absent(container_last_seen{container=~".+-bridge",pod=~".+-bridge-.+"})
-        for: 3m
-        labels:
-          severity: major
-        annotations:
-          summary: 'All Kafka Bridge containers down or in CrashLookBackOff status'
-          description: 'All Kafka Bridge containers have been down or in CrashLookBackOff status for 3 minutes'
-      - alert: AvgProducerLatency
-        expr: strimzi_bridge_kafka_producer_request_latency_avg > 10
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka Bridge average consumer fetch latency'
-          description: 'The average fetch latency is {{ $value }} on {{ $labels.clientId }}'
-      - alert: AvgConsumerFetchLatency
-        expr: strimzi_bridge_kafka_consumer_fetch_latency_avg > 500
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka Bridge consumer average fetch latency'
-          description: 'The average consumer commit latency is {{ $value }} on {{ $labels.clientId }}'
-      - alert: AvgConsumerCommitLatency
-        expr: strimzi_bridge_kafka_consumer_commit_latency_avg > 200
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka Bridge consumer average commit latency'
-          description: 'The average consumer commit latency is {{ $value }} on {{ $labels.clientId }}'
-      - alert: Http4xxErrorRate
-        expr: strimzi_bridge_http_server_requestCount_total{code=~"^4..$", container=~"^.+-bridge", path !="/favicon.ico"} > 10
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka Bridge returns code 4xx too often'
-          description: 'Kafka Bridge returns code 4xx too much ({{ $value }}) for the path {{ $labels.path }}'
-      - alert: Http5xxErrorRate
-        expr: strimzi_bridge_http_server_requestCount_total{code=~"^5..$", container=~"^.+-bridge"} > 10
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Kafka Bridge returns code 5xx too often'
-          description: 'Kafka Bridge returns code 5xx too much ({{ $value }}) for the path {{ $labels.path }}'
-
-    - name: kafkaExporter
-      rules:
-      - alert: UnderReplicatedPartition
-        expr: kafka_topic_partition_under_replicated_partition > 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Topic has under-replicated partitions'
-          description: 'Topic  {{ $labels.topic }} has {{ $value }} under-replicated partition {{ $labels.partition }}'
-      - alert: TooLargeConsumerGroupLag
-        expr: kafka_consumergroup_lag > 1000
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'Consumer group lag is too big'
-          description: 'Consumer group {{ $labels.consumergroup}} lag is too big ({{ $value }}) on topic {{ $labels.topic }}/partition {{ $labels.partition }}'
-      - alert: NoMessageForTooLong
-        expr: changes(kafka_topic_partition_current_offset{topic!="__consumer_offsets"}[10m]) == 0
-        for: 10s
-        labels:
-          severity: warning
-        annotations:
-          summary: 'No message for 10 minutes'
-          description: 'There is no messages in topic {{ $labels.topic}}/partition {{ $labels.partition }} for 10 minutes'  
-    - name: Instance
-      rules:
-      - alert: InstanceDown
-        expr: up == 0
-        for: 1m
-        labels:
-          severity: "critical"
-        annotations:
-          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute.'
-          summary: 'Instance {{ $labels.instance }} down'
-    - name: Kubernetes_memory_container
-      rules:
-      - alert: ContainerMemoryUsage
-        expr: (sum(container_memory_working_set_bytes{name!=""}) BY (instance, name) / sum(container_spec_memory_limit_bytes > 0) BY (instance, name) * 100) > 80
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: Container Memory usage (instance {{ $labels.instance }})
-          description: "Container Memory usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-    - name: ContaineCpuUsage
-      rules:
-      - alert: ContainerCpuUsage
-        expr: (sum(rate(container_cpu_usage_seconds_total{name!=""}[3m])) BY (instance, name) * 100) > 80
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: Container CPU usage (instance {{ $labels.instance }})
-          description: "Container CPU usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-    - name: HostOutofDiskSpace
-      rules:
-      - alert: HostOutOfDiskSpace
-        expr: (node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 10 and ON (instance, device, mountpoint) node_filesystem_readonly == 0
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: Host out of disk space (instance {{ $labels.instance }})
-          description: "Disk is almost full (< 10% left)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-    - name: HostMemoryUnderMemory
-      rules:
-      - alert: HostMemoryUnderMemoryPressure
-        expr: rate(node_vmstat_pgmajfault[1m]) > 1000
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: Host memory under memory pressure (instance {{ $labels.instance }})
-          description: "The node is under heavy memory pressure. High rate of major page faults\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-    - name: PrometheusRestart
-      rules:
-      - alert: PrometheusTooManyRestarts
-        expr: changes(process_start_time_seconds{job=~"prometheus|pushgateway|alertmanager"}[15m]) > 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: Prometheus too many restarts (instance {{ $labels.instance }})
-          description: "Prometheus has restarted more than twice in the last 15 minutes. It might be crashlooping.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-    - name: HostOutofMemory
-      rules:
-      - alert: HostOutOfMemory
-        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 20
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Out of memory (instance {{ $labels.instance }})"
-          description: "Node memory is filling up (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}" 
-    - name: container Killed
-      rules:
-      - alert: ContainerKilled
-        expr: time() - container_last_seen > 60
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Container killed (instance {{ $labels.instance }})"
-          description: "A container has disappeared\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}" 
-    - name: hostOutofDiskSpace
-      rules:
-      - alert: HostOutOfDiskSpace
-        expr: (node_filesystem_avail{mountpoint="/"}  * 100) / node_filesystem_size{mountpoint="/"} < 30
-        for: 1s
-        labels:
-          severity: warning
-        annotations:
-          summary: "Host out of disk space (instance {{ $labels.instance }})"
-          description: "Disk is almost full (< 50% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
-    - name: HostHighCpuLoad
-      rules:
-      - alert: HostHighCpuLoad
-        expr: (sum by (instance) (irate(node_cpu{job="node_exporter_metrics",mode="idle"}[5m]))) > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Host high CPU load (instance {{ $labels.instance }})"
-          description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
-            
+  alerting_rules.yml: {}
+  # groups:
+  #   - name: Instances
+  #     rules:
+  #       - alert: InstanceDown
+  #         expr: up == 0
+  #         for: 5m
+  #         labels:
+  #           severity: page
+  #         annotations:
+  #           description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes.'
+  #           summary: 'Instance {{ $labels.instance }} down'
   ## DEPRECATED DEFAULT VALUE, unless explicitly naming your files, please use alerting_rules.yml
   alerts: {}
-
 
   ## Records configuration
   ## Ref: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
@@ -1714,11 +1381,11 @@ serverFiles:
       - /etc/config/rules
       - /etc/config/alerts
 
-    scrape_configs: 
-    # - job_name: prometheus
-        #static_configs:
-                # - targets: ['msa-platform-prometheus-alertmanager.msa-platform.svc.cluster.local']
-              
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets:
+            - localhost:9090
 
       # A scrape configuration for running Prometheus on a Kubernetes cluster.
       # This uses separate scrape configs for cluster components (i.e. API server, node)

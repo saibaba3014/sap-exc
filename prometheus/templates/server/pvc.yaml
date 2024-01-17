@@ -1,34 +1,39 @@
-{{- /*
-Copyright VMware, Inc.
-SPDX-License-Identifier: APACHE-2.0
-*/}}
-
-{{- if and .Values.server.persistence.enabled (not .Values.server.persistence.existingClaim) -}}
-kind: PersistentVolumeClaim
+{{- if .Values.server.enabled -}}
+{{- if not .Values.server.statefulSet.enabled -}}
+{{- if .Values.server.persistentVolume.enabled -}}
+{{- if not .Values.server.persistentVolume.existingClaim -}}
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "prometheus.server.fullname" . }}
-  namespace: {{ include "common.names.namespace" . | quote }}
-  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
-    app.kubernetes.io/part-of: prometheus
-    app.kubernetes.io/component: server
-  {{- if or .Values.server.persistence.annotations .Values.commonAnnotations }}
-  {{- $annotations := include "common.tplvalues.merge" ( dict "values" ( list .Values.server.persistence.annotations .Values.commonAnnotations ) "context" . ) }}
-  annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $) | nindent 4 }}
+  {{- if .Values.server.persistentVolume.annotations }}
+  annotations:
+{{ toYaml .Values.server.persistentVolume.annotations | indent 4 }}
   {{- end }}
+  labels:
+    {{- include "prometheus.server.labels" . | nindent 4 }}
+  name: {{ template "prometheus.server.fullname" . }}
+{{ include "prometheus.namespace" . | indent 2 }}
 spec:
   accessModes:
-  {{- range .Values.server.persistence.accessModes }}
-    - {{ . | quote }}
-  {{- end }}
+{{ toYaml .Values.server.persistentVolume.accessModes | indent 4 }}
+{{- if .Values.server.persistentVolume.storageClass }}
+{{- if (eq "-" .Values.server.persistentVolume.storageClass) }}
+  storageClassName: ""
+{{- else }}
+  storageClassName: "{{ .Values.server.persistentVolume.storageClass }}"
+{{- end }}
+{{- end }}
+{{- if .Values.server.persistentVolume.volumeBindingMode }}
+  volumeBindingMode: "{{ .Values.server.persistentVolume.volumeBindingMode }}"
+{{- end }}
   resources:
     requests:
-      storage: {{ .Values.server.persistence.size | quote }}
-  {{- if .Values.server.persistence.selector }}
-  selector: {{- include "common.tplvalues.render" (dict "value" .Values.server.persistence.selector "context" $) | nindent 4 }}
-  {{- end }}
-  {{- if .Values.server.persistence.dataSource }}
-  dataSource: {{- include "common.tplvalues.render" (dict "value" .Values.server.persistence.dataSource "context" $) | nindent 4 }}
-  {{- end }}
-  {{- include "common.storage.class" (dict "persistence" .Values.server.persistence "global" .Values.global) | nindent 2 }}
+      storage: "{{ .Values.server.persistentVolume.size }}"
+{{- if .Values.server.persistentVolume.selector }}
+  selector:
+  {{- toYaml .Values.server.persistentVolume.selector | nindent 4 }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
