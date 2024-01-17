@@ -62,4 +62,8 @@ Step1. install nginx ingress control
  helm repo add nginx-stable https://helm.nginx.com/stable
  helm repo update
  helm install nginx-ingress nginx-stable/nginx-ingress --set rbac.create=true
+step 2: install grafana hemchart with custom valumes.yaml file
+ helm install grafana grafana --repo=https://grafana.github.io/helm-charts  -f grafana-values.yaml -n prometheus
+
+Step 3: enable dns
 

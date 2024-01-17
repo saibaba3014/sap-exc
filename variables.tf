@@ -1,4 +1,4 @@
- variable "region" {
+variable "region" {
   type    = string
   default = "us-central1"
 }
@@ -12,13 +12,14 @@ variable "project_id" {
   default = "k8s-project-hari"
 }
 variable "name" {
-  type    = string
+  type = string
 }
 
 variable "network_name" {
   description = "the name of the network"
-  type    = string
+  type        = string
 }
+
 
 variable "subnetwork_name" {
   description = "name for the subnetwork"
@@ -41,8 +42,8 @@ variable "svc_subnetwork_range" {
 }
 
 variable "subnetwork" {
-   type = string
-   description = "CIDR for subnetwor"
+  type        = string
+  description = "CIDR for subnetwor"
 }
 
 
@@ -89,7 +90,7 @@ variable "compute_engine_service_account" {
   description = "Service account to associate to the nodes in the cluster"
 }
 
-variable "cluster_service_account_name"{
+variable "cluster_service_account_name" {
 
 }
 variable "cluster_service_account_description" {
@@ -165,7 +166,7 @@ variable "cluster_autoscaling" {
 
 
 variable "cluster_name" {
-  type    = string
+  type = string
 }
 variable "enable_vertical_pod_autoscaling" {
   type        = bool
