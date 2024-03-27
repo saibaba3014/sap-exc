@@ -1,0 +1,67 @@
+name: 'GCP GKE setup'
+
+on:
+  workflow_dispatch:
+    inputs:
+      TFACTION:
+        default: "apply"
+        required: true
+        type: choice
+        options:
+         - "apply"
+         - "destroy"
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+env:
+  TF_HTTP_USERNAME: '${{ secrets.GITLAB_USER }}'
+  TF_HTTP_ADDRESS: '${{ secrets.GITLAB_URL }}/gcp'
+  TF_HTTP_PASSWORD: '${{ secrets.GITLAB_TOKEN }}'
+jobs:
+  terraform:
+    name: 'GKE setup'
+    runs-on: mylab-vm
+    container:
+      image: sharmavijay86/k8s-runner:v1
+    environment: production
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v3
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: 'projects/758849761540/locations/global/workloadIdentityPools/github/providers/github'
+        service_account: 'terraform-sa@mevijay-dev.iam.gserviceaccount.com'
+    
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.2.5
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - run: terraform init 
+      name: Terraform init
+      working-directory: gke
+
+    # Generates an execution plan for Terraform
+    - run: terraform plan 
+      name: terraform plan 
+      working-directory: gke
+
+    - name: Terraform Apply
+      if: ${{ github.event.inputs.TFACTION == 'apply' }}
+      run: terraform apply -auto-approve -input=false  
+      working-directory: gke
+      
+    - name: Terraform destroy
+      if: ${{ github.event.inputs.TFACTION == 'destroy' }}
+      run: terraform destroy -auto-approve -input=false 
+      working-directory: gke
